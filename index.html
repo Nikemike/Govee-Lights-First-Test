@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OSINT Collection Dashboard</title>
+<style>
+:root{--bg:#0b0f14;--panel:#121820;--panel2:#171f29;--line:#24303d;--text:#e6edf3;--mute:#8b98a5;--acc:#3dd6a3;--acc2:#5aa9ff;--warn:#ffb454;--bad:#ff6b6b;--chip:#1e2a37}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Inter,sans-serif}
+a{color:var(--acc2);text-decoration:none}a:hover{text-decoration:underline}
+header{position:sticky;top:0;z-index:5;background:linear-gradient(180deg,#0e141b,#0b0f14);border-bottom:1px solid var(--line);padding:10px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+header h1{font-size:16px;margin:0;letter-spacing:.3px}
+header h1 span{color:var(--acc)}
+nav{display:flex;gap:4px;flex-wrap:wrap;margin-left:auto}
+nav button{background:transparent;border:1px solid var(--line);color:var(--mute);padding:6px 10px;border-radius:6px;cursor:pointer;font-size:13px}
+nav button.on{color:var(--text);border-color:var(--acc);background:#12201b}
+main{max-width:1280px;margin:0 auto;padding:16px}
+.view{display:none}.view.on{display:block}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px}
+.card h2{font-size:14px;margin:0 0 10px;color:var(--mute);text-transform:uppercase;letter-spacing:.8px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+input[type=text],textarea,select{background:#0d1319;border:1px solid var(--line);color:var(--text);border-radius:8px;padding:10px 12px;font:inherit;width:100%}
+input[type=text]:focus,textarea:focus{outline:none;border-color:var(--acc2)}
+textarea{min-height:160px;resize:vertical;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px}
+.big{font-size:16px}
+.btn{background:var(--panel2);border:1px solid var(--line);color:var(--text);padding:8px 12px;border-radius:8px;cursor:pointer;font:inherit;white-space:nowrap}
+.btn:hover{border-color:var(--acc2)}
+.btn.pri{background:#13352a;border-color:var(--acc);color:#d9fff1}
+.btn.sm{padding:4px 8px;font-size:12px}
+.chip{display:inline-block;background:var(--chip);border:1px solid var(--line);border-radius:999px;padding:2px 9px;font-size:12px;color:var(--mute);cursor:pointer}
+.chip.on{border-color:var(--acc);color:var(--text)}
+.badge{display:inline-block;font-size:10.5px;padding:1px 6px;border-radius:4px;margin-left:6px;vertical-align:middle;border:1px solid var(--line);color:var(--mute)}
+.badge.paid{color:var(--warn);border-color:#4a3a1c}.badge.cli{color:#c9a7ff;border-color:#3b2a5c}.badge.paste{color:var(--mute)}.badge.unv{color:var(--bad);border-color:#5a2525}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px}
+.tool{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px}
+.tool .t{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+.tool .t a{font-weight:600;color:var(--text)}
+.tool .d{color:var(--mute);font-size:12.5px;margin-top:4px}
+.tool label{font-size:12px;color:var(--mute);display:flex;gap:6px;align-items:center;cursor:pointer}
+.mute{color:var(--mute)}.small{font-size:12px}
+.det{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px}
+.det .k{color:var(--mute);font-size:12px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:900px){.two{grid-template-columns:1fr}}
+pre{background:#0d1319;border:1px solid var(--line);border-radius:8px;padding:10px;overflow:auto;font-size:12.5px;margin:6px 0}
+.log li{padding:4px 0;border-bottom:1px dashed var(--line);font-size:12.5px}
+.log li time{color:var(--mute);margin-right:8px}
+.wf{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.wf .step{background:var(--panel2);border:1px solid var(--line);border-left:3px solid var(--acc);border-radius:8px;padding:10px}
+.wf .step b{display:block;margin-bottom:4px}
+.wf .step ul{margin:4px 0 0 16px;padding:0;font-size:12.5px;color:var(--mute)}
+.toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#13352a;border:1px solid var(--acc);color:#d9fff1;padding:8px 14px;border-radius:8px;display:none;z-index:9}
+.kbd{font-family:ui-monospace,monospace;background:#0d1319;border:1px solid var(--line);border-radius:4px;padding:0 5px;font-size:12px}
+hr{border:0;border-top:1px solid var(--line);margin:12px 0}
+.legend span{margin-right:12px}
+.ov{background:#0d1319;border:1px solid var(--line);border-radius:8px;padding:10px;overflow:auto}
+</style>
+</head>
+<body>
+<header>
+  <h1><span>◈</span> OSINT Collection Dashboard</h1>
+  <nav>
+    <button class="on" data-v="pivot">Pivot</button>
+    <button data-v="browse">All tools</button>
+    <button data-v="workflow">Workflow</button>
+    <button data-v="cli">Local toolkit</button>
+    <button data-v="case">Case notes</button>
+    <button data-v="about">Sources</button>
+  </nav>
+</header>
+<main>
+
+<!-- ===== PIVOT ===== -->
+<section class="view on" id="v-pivot">
+  <div class="card">
+    <h2>Selector</h2>
+    <div class="row">
+      <input type="text" id="q" class="big" placeholder="Paste a username, email, phone, domain, IP, URL, name, image URL, wallet, VIN, or lat,lon…" autocomplete="off" spellcheck="false">
+    </div>
+    <div class="det">
+      <span class="k">Detected:</span><span id="detected" class="chip on">—</span>
+      <span class="k" style="margin-left:10px">Override:</span>
+      <span id="typechips"></span>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn pri" id="openSel">Open selected ↗</button>
+      <button class="btn" id="copySel">Copy selected URLs</button>
+      <button class="btn" id="selAll">Select all</button>
+      <button class="btn" id="selNone">Select none</button>
+      <button class="btn" id="selFree">Free + direct-query only</button>
+      <span class="mute small" id="hint"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Pivots for <span id="pivotType" style="color:var(--text)">—</span> <span class="mute" id="pivotCount"></span></h2>
+    <div class="legend small mute" style="margin-bottom:10px">
+      <span><span class="badge">direct</span> URL carries your query</span>
+      <span><span class="badge paste">paste</span> opens the tool; paste the selector</span>
+      <span><span class="badge paid">paid</span> free tier limited or paid</span>
+      <span><span class="badge unv">unverified</span> query-URL pattern I specifically doubt (see Sources tab for overall verification status)</span>
+    </div>
+    <div class="grid" id="pivots"></div>
+  </div>
+</section>
+
+<!-- ===== BROWSE ===== -->
+<section class="view" id="v-browse">
+  <div class="card">
+    <h2>Filter</h2>
+    <div class="row">
+      <input type="text" id="filter" placeholder="Search tools by name, category, tag…">
+    </div>
+    <div class="det" id="catchips"></div>
+  </div>
+  <div class="grid" id="all"></div>
+</section>
+
+<!-- ===== WORKFLOW ===== -->
+<section class="view" id="v-workflow">
+  <div class="card">
+    <h2>Chain-the-free-tools workflow (r/OSINT consensus, via secondary roundups)</h2>
+    <p class="mute small">Reddit threads themselves were not directly readable from the build environment; this is the ordering repeated across the roundups that cite them. Every lead needs a second independent source before it goes in a report.</p>
+    <div class="wf">
+      <div class="step"><b>0 · Scope &amp; OPSEC</b><ul><li>Write the question you're answering</li><li>Sock-puppet browser profile / VPN</li><li>Start a case in <em>Case notes</em></li></ul></div>
+      <div class="step"><b>1 · Email → accounts</b><ul><li>Epieos, Holehe (CLI)</li><li>HIBP for breach presence</li><li>EmailRep for reputation</li><li>Gravatar / Google account artifacts</li></ul></div>
+      <div class="step"><b>2 · Username → profiles</b><ul><li>WhatsMyName to scope (browser)</li><li>Maigret for depth (CLI, recursive)</li><li>IDCrawl / Google quoted</li><li>Check handle variants manually</li></ul></div>
+      <div class="step"><b>3 · Phone → owner/carrier</b><ul><li>PhoneInfoga (CLI) for carrier/type</li><li>Truecaller / Sync.me (login)</li><li>Google the number in 3 formats</li><li>WhatsApp/Telegram existence checks</li></ul></div>
+      <div class="step"><b>4 · Image → source/place</b><ul><li>Yandex first for faces (free)</li><li>Google Lens, Bing, TinEye</li><li>FaceCheck / PimEyes if budget</li><li>EXIF → GeoSpy → SunCalc → Mapillary</li></ul></div>
+      <div class="step"><b>5 · Domain/IP → infra</b><ul><li>crt.sh + Merklemap subdomains</li><li>Shodan / Censys hosts</li><li>Wayback + urlscan history</li><li>theHarvester / Amass (CLI)</li></ul></div>
+      <div class="step"><b>6 · Name → records</b><ul><li>People search aggregators</li><li>Court / voter / property records</li><li>OpenCorporates, Sunbiz, EDGAR</li><li>OpenSanctions</li></ul></div>
+      <div class="step"><b>7 · Preserve &amp; report</b><ul><li>archive.today + Wayback every find</li><li>Hunchly or Auto Archiver</li><li>Export case log (Case notes tab)</li><li>Rate confidence per claim</li></ul></div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Selector → pivot map</h2>
+    <div class="ov">
+<svg viewBox="0 0 1100 330" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="ui-sans-serif,system-ui" font-size="13">
+<defs><marker id="a" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8z" fill="#5aa9ff"/></marker></defs>
+<g stroke="#5aa9ff" stroke-width="1.5" fill="none" marker-end="url(#a)">
+<path d="M150,165 L250,60"/><path d="M150,165 L250,115"/><path d="M150,165 L250,165"/><path d="M150,165 L250,215"/><path d="M150,165 L250,270"/>
+<path d="M430,60 L560,60"/><path d="M430,115 L560,115"/><path d="M430,165 L560,165"/><path d="M430,215 L560,215"/><path d="M430,270 L560,270"/>
+<path d="M740,60 C800,60 800,115 870,115"/><path d="M740,115 C800,115 800,60 870,60"/><path d="M740,165 L870,165"/><path d="M740,215 L870,215"/><path d="M740,270 L870,270"/>
+<path d="M960,60 C1040,60 1040,300 150,300 C100,300 90,200 150,180" stroke="#3dd6a3" stroke-dasharray="4 4"/>
+</g>
+<g fill="#171f29" stroke="#24303d">
+<rect x="30" y="140" width="120" height="50" rx="8"/>
+<rect x="250" y="40" width="180" height="40" rx="8"/><rect x="250" y="95" width="180" height="40" rx="8"/><rect x="250" y="145" width="180" height="40" rx="8"/><rect x="250" y="195" width="180" height="40" rx="8"/><rect x="250" y="250" width="180" height="40" rx="8"/>
+<rect x="560" y="40" width="180" height="40" rx="8"/><rect x="560" y="95" width="180" height="40" rx="8"/><rect x="560" y="145" width="180" height="40" rx="8"/><rect x="560" y="195" width="180" height="40" rx="8"/><rect x="560" y="250" width="180" height="40" rx="8"/>
+<rect x="870" y="40" width="190" height="40" rx="8"/><rect x="870" y="95" width="190" height="40" rx="8"/><rect x="870" y="145" width="190" height="40" rx="8"/><rect x="870" y="195" width="190" height="40" rx="8"/><rect x="870" y="250" width="190" height="40" rx="8"/>
+</g>
+<g fill="#e6edf3" text-anchor="middle">
+<text x="90" y="160">Selector</text><text x="90" y="178" fill="#8b98a5" font-size="11">auto-detected</text>
+<text x="340" y="65">Email</text><text x="340" y="120">Username</text><text x="340" y="170">Domain / IP / URL</text><text x="340" y="220">Image URL</text><text x="340" y="275">Name / Phone</text>
+<text x="650" y="65">Epieos · Holehe · HIBP</text><text x="650" y="120">WhatsMyName · Maigret</text><text x="650" y="170">crt.sh · Shodan · Wayback</text><text x="650" y="220">Yandex · Lens · TinEye</text><text x="650" y="275">People search · Records</text>
+<text x="965" y="65">new usernames</text><text x="965" y="120">new emails / names</text><text x="965" y="170">hosts · subdomains · emails</text><text x="965" y="220">places · profiles</text><text x="965" y="275">addresses · relatives · cos.</text>
+<text x="560" y="318" fill="#3dd6a3" font-size="12">↺ every output becomes a new selector — log each pivot in Case notes</text>
+</g>
+</svg>
+    </div>
+  </div>
+</section>
+
+<!-- ===== CLI ===== -->
+<section class="view" id="v-cli">
+  <div class="card">
+    <h2>Local toolkit — the CLI tools the roundups agree on</h2>
+    <p class="mute small">Install on a dedicated VM or Kali box, not your daily driver. Maintenance status below is from third-party roundups dated Sep–Oct 2026; re-check the repo before relying on it.</p>
+    <div class="two">
+      <div>
+        <b>Username</b>
+        <pre>pipx install sherlock-project      # ~400 sites, fast first pass
+pipx install maigret               # 3,000+ sites, recursive, profile parsing
+sherlock &lt;user&gt;
+maigret &lt;user&gt; --html</pre>
+        <b>Email</b>
+        <pre>pipx install holehe               # email → registered accounts (120+ sites)
+holehe &lt;email&gt;
+# Note: roundups report Holehe module list last updated Jul 2024</pre>
+        <b>Phone</b>
+        <pre># PhoneInfoga (Go) — README says "stable but unmaintained"
+go install github.com/sundowndev/phoneinfoga/v2@latest
+phoneinfoga scan -n "+1…"</pre>
+        <b>Images</b>
+        <pre>sudo apt install libimage-exiftool-perl
+exiftool -a -G1 image.jpg          # all metadata incl. GPS</pre>
+      </div>
+      <div>
+        <b>Domain / infrastructure</b>
+        <pre>pipx install theHarvester         # emails, subdomains, hosts from passive sources
+theHarvester -d example.com -b all
+
+# OWASP Amass — deepest subdomain enumeration; v5.x active 2026
+go install -v github.com/owasp-amass/amass/v4/...@master
+amass enum -passive -d example.com
+
+# Recon-ng — modular; roundups report no commits since Nov 2024
+sudo apt install recon-ng</pre>
+        <b>Automation / all-in-one</b>
+        <pre># SpiderFoot (open source v4; HX hosted product discontinued)
+git clone https://github.com/smicallef/spiderfoot && cd spiderfoot
+pip3 install -r requirements.txt && python3 sf.py -l 127.0.0.1:5001
+
+# Consensus-OSINT — merges 19 username/email/phone projects (2026)
+pipx install consensus-osint</pre>
+        <b>Evidence</b>
+        <pre># Bellingcat Auto Archiver — archive URLs w/ hashes &amp; screenshots
+pipx install auto-archiver</pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== CASE ===== -->
+<section class="view" id="v-case">
+  <div class="two">
+    <div class="card">
+      <h2>Case notes <span class="mute small">(saved only in this browser)</span></h2>
+      <div class="row" style="margin-bottom:8px">
+        <input type="text" id="caseName" placeholder="Case name / reference" style="max-width:360px">
+        <button class="btn" id="exportMd">Copy as Markdown</button>
+        <button class="btn" id="clearCase">Clear case</button>
+      </div>
+      <textarea id="notes" placeholder="Findings, confidence (confirmed / probable / possible), source URLs, timestamps…"></textarea>
+    </div>
+    <div class="card">
+      <h2>Pivot log <span class="mute small">(auto-recorded when you open a pivot)</span></h2>
+      <ul class="log" id="log" style="list-style:none;padding:0;margin:0"></ul>
+    </div>
+  </div>
+</section>
+
+<!-- ===== ABOUT ===== -->
+<section class="view" id="v-about">
+  <div class="card">
+    <h2>Where this inventory came from</h2>
+    <ul class="small">
+      <li><a href="https://github.com/jivoi/awesome-osint" target="_blank" rel="noopener">jivoi/awesome-osint</a> — primary source for most web tools and categories</li>
+      <li><a href="https://bellingcat.gitbook.io/toolkit" target="_blank" rel="noopener">Bellingcat Online Investigation Toolkit</a> (volunteer-curated, replaces the old spreadsheet)</li>
+      <li><a href="https://cipher387.github.io/osint_stuff_tool_collection/" target="_blank" rel="noopener">cipher387 / Cyber Detective tool collection</a></li>
+      <li><a href="https://github.com/Astrosp/Awesome-OSINT-For-Everything" target="_blank" rel="noopener">Awesome-OSINT-For-Everything</a></li>
+      <li><a href="https://start.me/p/DPYPMz/the-ultimate-osint-collection" target="_blank" rel="noopener">The Ultimate OSINT Collection (start.me)</a> and the other start.me pages indexed by <a href="https://github.com/C3n7ral051nt4g3ncy/OSINT_Inception-links" target="_blank" rel="noopener">OSINT_Inception-links</a></li>
+      <li><a href="https://osintframework.com/" target="_blank" rel="noopener">OSINT Framework</a></li>
+      <li>Reddit consensus via <a href="https://clearfront.sh/resources/best-osint-tools-reddit-2026" target="_blank" rel="noopener">Clearfront's r/OSINT roundup</a> and <a href="https://kalilinuxtutorials.com/best-free-osint-tools-reddit/" target="_blank" rel="noopener">Kali Linux Tutorials</a>, which cite r/OSINT threads <a href="https://www.reddit.com/r/OSINT/comments/1qx59dc/" target="_blank" rel="noopener">1qx59dc</a>, <a href="https://www.reddit.com/r/OSINT/comments/1qz5ea6/" target="_blank" rel="noopener">1qz5ea6</a>, <a href="https://www.reddit.com/r/OSINT/comments/1gysoni/" target="_blank" rel="noopener">1gysoni</a>. <b>Reddit itself was not fetchable from the build environment.</b></li>
+      <li>Maintenance status: <a href="https://guptadeepak.com/tools/top-5-osint-tools-2026/" target="_blank" rel="noopener">guptadeepak.com (Sep 2026)</a>, <a href="https://maxintel.org/osint-tools.html" target="_blank" rel="noopener">maxintel.org (Oct 2026)</a>, <a href="https://github.com/OSINT-Experts-Society/Consensus-OSINT" target="_blank" rel="noopener">Consensus-OSINT</a></li>
+    </ul>
+    <hr>
+    <p class="small mute"><b>Verification status (2026-11-09):</b> URL templates were built from documented patterns, not live-tested — the build environment could reach almost none of these sites (robots/JS/blocklists). Live-confirmed: EmailRep. Live-failed and demoted to paste: Judyrecords. Templates marked <span class="badge unv">unverified</span> are ones I had specific doubt about; the rest are standard patterns but still unconfirmed by me. If a direct link lands on a blank search box, treat it as paste and tell me so I can fix it. Tools marked <span class="badge paste">paste</span> have no stable query URL. Use only on targets you're authorized to investigate; several listed services log searches.</p>
+  </div>
+</section>
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+// ---------- Tool inventory ----------
+// types: username,email,phone,ip,domain,url,image,name,company,hash,btc,eth,vin,coords,any
+// q: URL template. Vars: {q} encoded, {raw}, {digits}, {dash} (spaces->-), {lower}, {host}
+// v: false => query URL pattern unverified. paid: true. cli: true.
+const TOOLS = [
+// --- Search engines / dorks ---
+{n:"Google (quoted)",c:"Search",q:"https://www.google.com/search?q=%22{q}%22",t:["any"],d:"Exact-phrase search. Try variants and dorks (site:, intext:, filetype:)."},
+{n:"Bing",c:"Search",q:"https://www.bing.com/search?q=%22{q}%22",t:["any"],d:"Different index than Google; worth a second pass."},
+{n:"DuckDuckGo",c:"Search",q:"https://duckduckgo.com/?q=%22{q}%22",t:["any"],d:"Bing-backed with less personalization."},
+{n:"Yandex",c:"Search",q:"https://yandex.com/search/?text={q}",t:["any"],d:"Strong for RU/Eastern Europe and image/face matching."},
+{n:"Baidu",c:"Search",q:"https://www.baidu.com/s?wd={q}",t:["any"],d:"Chinese-language web."},
+{n:"Brave Search",c:"Search",q:"https://search.brave.com/search?q={q}",t:["any"],d:"Independent index."},
+{n:"Google Hacking Database",c:"Search",u:"https://www.exploit-db.com/google-hacking-database",t:[],d:"Dork library."},
+{n:"DorkGPT",c:"Search",u:"https://www.dorkgpt.com/",t:[],d:"AI dork generator."},
+{n:"Carrot2",c:"Search",q:"https://search.carrot2.org/#/search/web/{q}/treemap",t:["any"],v:false,d:"Clustering search — groups results by topic."},
+// --- Username ---
+{n:"WhatsMyName",c:"Username",q:"https://whatsmyname.app/?q={q}",t:["username"],d:"~700 sites, browser-based, actively maintained. Reddit's standard first pass."},
+{n:"IDCrawl username",c:"Username",q:"https://www.idcrawl.com/u/{q}",t:["username"],d:"Aggregated profiles for a handle."},
+{n:"Namechk",c:"Username",u:"https://namechk.com/",t:["username"],d:"Availability check across platforms (availability ≠ ownership)."},
+{n:"UserSearch.org",c:"Username",u:"https://www.usersearch.org/",t:["username"],d:"Username/email across social, dating, forums."},
+{n:"Reddit user (old UI)",c:"Username",q:"https://old.reddit.com/user/{q}",t:["username"],d:"Fastest chronological profile view."},
+{n:"GitHub",c:"Username",q:"https://github.com/{q}",t:["username"],d:"Profile, repos, commit emails."},
+{n:"X / Twitter",c:"Username",q:"https://x.com/{q}",t:["username"],d:"Direct profile."},
+{n:"Instagram",c:"Username",q:"https://www.instagram.com/{q}/",t:["username"],d:"Direct profile (login may be required)."},
+{n:"TikTok",c:"Username",q:"https://www.tiktok.com/@{q}",t:["username"],d:"Direct profile."},
+{n:"Telegram",c:"Username",q:"https://t.me/{q}",t:["username"],d:"Public username/channel check."},
+{n:"Steam",c:"Username",q:"https://steamcommunity.com/id/{q}",t:["username"],d:"Vanity URL check."},
+{n:"Keybase",c:"Username",q:"https://keybase.io/{q}",t:["username"],d:"Cross-proofs of identities."},
+{n:"Bluesky",c:"Username",q:"https://bsky.app/profile/{q}.bsky.social",t:["username"],d:"Default-handle guess."},
+{n:"Maigret",c:"Username",u:"https://github.com/soxoj/maigret",t:["username"],cli:true,d:"3,000+ sites, recursive, builds a dossier. Run locally."},
+{n:"Sherlock",c:"Username",u:"https://github.com/sherlock-project/sherlock",t:["username"],cli:true,d:"Fast first-pass enumeration. Run locally."},
+// --- Email ---
+{n:"Epieos",c:"Email",q:"https://epieos.com/?q={q}&t=email",t:["email"],v:false,d:"Google account artifacts, Skype, Gravatar, linked services. Core free email pivot."},
+{n:"Have I Been Pwned",c:"Email",q:"https://haveibeenpwned.com/account/{q}",t:["email"],v:false,d:"Breach presence (which breaches, not contents)."},
+{n:"EmailRep",c:"Email",q:"https://emailrep.io/{q}",t:["email"],d:"Reputation, first-seen, profile hints."},
+{n:"Hunter (domain)",c:"Email",q:"https://hunter.io/search/{host}",t:["email","domain"],d:"Email pattern and known addresses for a domain.",paid:true},
+{n:"MXToolbox",c:"Email",q:"https://mxtoolbox.com/SuperTool.aspx?action=mx%3a{host}&run=toolpage",t:["email","domain"],d:"MX/SPF/DMARC — identify mail provider."},
+{n:"Holehe",c:"Email",u:"https://github.com/megadose/holehe",t:["email"],cli:true,d:"Email → registered accounts via password-reset probes (120+ sites)."},
+{n:"Hudson Rock email check",c:"Email",u:"https://www.hudsonrock.com/threat-intelligence-cybercrime-tools/email-address-search",t:["email"],d:"Free check: does this email appear in infostealer logs."},
+{n:"Gravatar",c:"Email",u:"https://gravatar.com/",t:["email"],d:"Profile by email hash (compute MD5 of lowercase email → gravatar.com/avatar/<md5>)."},
+// --- Breach / leak ---
+{n:"Intelligence X",c:"Breach / Leak",q:"https://intelx.io/?s={q}",t:["email","domain","ip","username","phone","btc","name"],paid:true,d:"Pastes, leaks, darknet, WHOIS history. Free tier limited."},
+{n:"DeHashed",c:"Breach / Leak",q:"https://dehashed.com/search?query={q}",t:["email","username","phone","ip","name"],paid:true,d:"Breach contents search. Reddit's usual paid pick."},
+{n:"LeakCheck",c:"Breach / Leak",u:"https://leakcheck.io/",t:["email","username","phone"],paid:true,d:"Breach search; free tier shows sources only."},
+{n:"Snusbase",c:"Breach / Leak",u:"https://snusbase.com/",t:["email","username"],paid:true,d:"Breach database search."},
+// --- Phone ---
+{n:"Truecaller",c:"Phone",q:"https://www.truecaller.com/search/us/{digits}",t:["phone"],v:false,d:"Crowd-sourced caller ID (login; country code in path)."},
+{n:"Sync.ME",c:"Phone",u:"https://sync.me/",t:["phone"],d:"Reverse phone lookup."},
+{n:"USPhoneBook",c:"Phone",q:"https://www.usphonebook.com/{digits}",t:["phone"],v:false,d:"US reverse phone."},
+{n:"FreeCarrierLookup",c:"Phone",u:"https://freecarrierlookup.com/",t:["phone"],d:"Carrier and line type."},
+{n:"Phone Validator",c:"Phone",u:"https://www.phonevalidator.com/",t:["phone"],d:"Line type / carrier / location."},
+{n:"WhatsApp checker (2Chat)",c:"Phone",u:"https://2chat.co/tools/whatsapp-checker",t:["phone"],d:"Does the number have WhatsApp."},
+{n:"PhoneInfoga",c:"Phone",u:"https://github.com/sundowndev/phoneinfoga",t:["phone"],cli:true,d:"Carrier, region, line type, footprint. Marked unmaintained."},
+// --- Name / people ---
+{n:"TruePeopleSearch",c:"People",q:"https://www.truepeoplesearch.com/results?name={q}",t:["name"],d:"US people search (free)."},
+{n:"FastPeopleSearch",c:"People",q:"https://www.fastpeoplesearch.com/name/{dash}",t:["name"],d:"US people search (free)."},
+{n:"Whitepages",c:"People",q:"https://www.whitepages.com/name/{dash}",t:["name"],d:"US addresses/phones; details paid.",paid:true},
+{n:"Spokeo",c:"People",q:"https://www.spokeo.com/{dash}",t:["name"],paid:true,d:"Aggregator."},
+{n:"IDCrawl",c:"People",q:"https://www.idcrawl.com/{dash}",t:["name"],d:"Free aggregator of social profiles."},
+{n:"LinkedIn via Google",c:"People",q:"https://www.google.com/search?q=site%3Alinkedin.com%2Fin+%22{q}%22",t:["name"],d:"Public LinkedIn profiles without logging in."},
+{n:"OpenSanctions",c:"People",q:"https://www.opensanctions.org/search/?q={q}",t:["name","company"],d:"Sanctions, PEPs, wanted lists."},
+{n:"Judyrecords",c:"People",u:"https://www.judyrecords.com/",t:["name","company"],d:"770M+ US court records (query param tested 2026-11-09: does not prefill)."},
+{n:"CourtListener / RECAP",c:"People",q:"https://www.courtlistener.com/?q=%22{q}%22",t:["name","company"],d:"Federal court filings."},
+{n:"VoterRecords",c:"People",q:"https://voterrecords.com/voters/{dash}",t:["name"],v:false,d:"US voter registrations (where public)."},
+{n:"FamilyTreeNow",c:"People",u:"https://www.familytreenow.com/",t:["name"],d:"Relatives and addresses."},
+{n:"BOP Inmate Locator",c:"People",u:"https://www.bop.gov/inmateloc/",t:["name"],d:"Federal inmates."},
+// --- Florida / local public records ---
+{n:"Sunbiz (FL corporations)",c:"Public records (FL)",u:"https://search.sunbiz.org/Inquiry/CorporationSearch/ByName",t:["name","company"],d:"FL business entities, officers, registered agents."},
+{n:"FL DBPR license lookup",c:"Public records (FL)",u:"https://www.myfloridalicense.com/wl11.asp",t:["name","company"],d:"Contractor and professional licenses."},
+{n:"Collier County Property Appraiser",c:"Public records (FL)",u:"https://www.collierappraiser.com/",t:["name"],d:"Parcel ownership and sales."},
+{n:"Collier Clerk official records",c:"Public records (FL)",u:"https://www.collierclerk.com/records-search/official-records-search",t:["name","company"],d:"Deeds, liens, judgments."},
+{n:"FL Dept of Corrections",c:"Public records (FL)",u:"https://pubapps.fdc.myflorida.com/OffenderSearch/",t:["name"],d:"State inmate/supervision search."},
+// --- Company ---
+{n:"OpenCorporates",c:"Company",q:"https://opencorporates.com/companies?q={q}",t:["company","name"],d:"Global company registry aggregator."},
+{n:"SEC EDGAR",c:"Company",q:"https://efts.sec.gov/LATEST/search-index?q=%22{q}%22",t:["company","name"],v:false,d:"Full-text filings search."},
+{n:"OpenOwnership",c:"Company",q:"https://register.openownership.org/search?q={q}",t:["company","name"],d:"Beneficial ownership."},
+{n:"LittleSis",c:"Company",q:"https://littlesis.org/search?q={q}",t:["company","name"],d:"Who-knows-who among the powerful."},
+{n:"Crunchbase",c:"Company",q:"https://www.crunchbase.com/textsearch?q={q}",t:["company"],paid:true,d:"Startups, funding, people."},
+{n:"BBB",c:"Company",q:"https://www.bbb.org/search?find_text={q}",t:["company"],d:"Complaints and ratings."},
+{n:"ICIJ Offshore Leaks",c:"Company",q:"https://offshoreleaks.icij.org/search?q={q}",t:["company","name"],d:"Panama/Paradise/Pandora papers entities."},
+// --- Domain ---
+{n:"crt.sh",c:"Domain",q:"https://crt.sh/?q={host}",t:["domain","url"],d:"Certificate transparency → subdomains."},
+{n:"Merklemap",c:"Domain",q:"https://www.merklemap.com/search?query={host}",t:["domain","url"],d:"CT-based subdomain discovery."},
+{n:"ICANN RDAP / WHOIS",c:"Domain",q:"https://lookup.icann.org/en/lookup?name={host}",t:["domain","url"],d:"Registrar, dates, nameservers."},
+{n:"SecurityTrails",c:"Domain",q:"https://securitytrails.com/domain/{host}/dns",t:["domain","url"],paid:true,d:"DNS history, subdomains (free tier w/ login)."},
+{n:"ViewDNS reverse IP",c:"Domain",q:"https://viewdns.info/reverseip/?host={host}&t=1",t:["domain","ip","url"],d:"Other sites on the same host; many other tools."},
+{n:"DNSDumpster",c:"Domain",u:"https://dnsdumpster.com/",t:["domain","url"],d:"DNS map (form POST — paste)."},
+{n:"Robtex",c:"Domain",q:"https://www.robtex.com/dns-lookup/{host}",t:["domain","url"],d:"DNS/AS graph."},
+{n:"BuiltWith",c:"Domain",q:"https://builtwith.com/{host}",t:["domain","url"],d:"Tech stack, analytics IDs (pivot on GA/AdSense IDs)."},
+{n:"urlscan.io",c:"Domain",q:"https://urlscan.io/search/#{host}",t:["domain","url","ip"],d:"Prior scans, screenshots, resources."},
+{n:"VirusTotal domain",c:"Domain",q:"https://www.virustotal.com/gui/domain/{host}",t:["domain","url"],d:"Reputation, passive DNS, related."},
+{n:"Shodan hostname",c:"Domain",q:"https://www.shodan.io/search?query=hostname%3A{host}",t:["domain","url"],paid:true,d:"Exposed services for the hostname (login)."},
+{n:"Censys hosts",c:"Domain",q:"https://search.censys.io/search?resource=hosts&q={host}",t:["domain","url"],d:"Internet-wide host scan data."},
+{n:"SSL Labs",c:"Domain",q:"https://www.ssllabs.com/ssltest/analyze.html?d={host}",t:["domain","url"],d:"TLS config and cert chain."},
+{n:"Wayback Machine",c:"Archive",q:"https://web.archive.org/web/*/{raw}*",t:["domain","url"],d:"Historical snapshots; use * for all URLs under a host."},
+{n:"archive.today",c:"Archive",q:"https://archive.ph/{raw}",t:["domain","url"],d:"Snapshot lookup; also use to preserve findings."},
+{n:"Google cache (via search)",c:"Archive",q:"https://www.google.com/search?q=site%3A{host}",t:["domain","url"],d:"Indexed pages for the host."},
+{n:"theHarvester",c:"Domain",u:"https://github.com/laramies/theHarvester",t:["domain"],cli:true,d:"Emails, subdomains, hosts from passive sources."},
+{n:"OWASP Amass",c:"Domain",u:"https://github.com/owasp-amass/amass",t:["domain"],cli:true,d:"Deep subdomain/infra enumeration."},
+// --- IP ---
+{n:"Shodan host",c:"IP",q:"https://www.shodan.io/host/{q}",t:["ip"],d:"Open ports, banners, vulns."},
+{n:"Censys host",c:"IP",q:"https://search.censys.io/hosts/{q}",t:["ip"],d:"Services and certs."},
+{n:"AbuseIPDB",c:"IP",q:"https://www.abuseipdb.com/check/{q}",t:["ip"],d:"Abuse reports."},
+{n:"GreyNoise",c:"IP",q:"https://viz.greynoise.io/ip/{q}",t:["ip"],d:"Is it a mass scanner / background noise."},
+{n:"VirusTotal IP",c:"IP",q:"https://www.virustotal.com/gui/ip-address/{q}",t:["ip"],d:"Reputation and passive DNS."},
+{n:"ipinfo.io",c:"IP",q:"https://ipinfo.io/{q}",t:["ip"],d:"ASN, geo, hosting/VPN flags."},
+{n:"BGPView",c:"IP",q:"https://bgpview.io/ip/{q}",t:["ip"],d:"Prefix and ASN ownership."},
+{n:"ARIN RDAP",c:"IP",q:"https://search.arin.net/rdap/?query={q}",t:["ip"],d:"Registration (redirects to correct RIR)."},
+{n:"Talos Reputation",c:"IP",q:"https://talosintelligence.com/reputation_center/lookup?search={q}",t:["ip","domain"],d:"Cisco reputation and email volume."},
+{n:"Robtex IP",c:"IP",q:"https://www.robtex.com/ip-lookup/{q}",t:["ip"],d:"Reverse DNS, neighbors."},
+{n:"Criminal IP",c:"IP",q:"https://www.criminalip.io/asset/report/{q}",t:["ip"],v:false,paid:true,d:"Asset search engine."},
+// --- Image ---
+{n:"Yandex Images",c:"Image",q:"https://yandex.com/images/search?rpt=imageview&url={q}",t:["image"],d:"Best free face/similar-image matching. Start here."},
+{n:"Google Lens",c:"Image",q:"https://lens.google.com/uploadbyurl?url={q}",t:["image"],d:"Objects, text, landmarks."},
+{n:"Bing Visual Search",c:"Image",q:"https://www.bing.com/images/search?view=detailv2&iss=sbi&form=SBIIRP&q=imgurl%3A{q}",t:["image"],d:"Second opinion on objects/places."},
+{n:"TinEye",c:"Image",q:"https://tineye.com/search?url={q}",t:["image"],d:"Oldest/first appearance, modifications."},
+{n:"ImgOps",c:"Image",q:"https://imgops.com/{raw}",t:["image"],d:"Hub: launches many reverse/analysis tools."},
+{n:"Jeffrey's EXIF viewer",c:"Image",q:"https://exif.regex.info/exif.cgi?url={q}",t:["image"],v:false,d:"Metadata incl. GPS (server-side; strips nothing)."},
+{n:"FotoForensics",c:"Image",u:"https://fotoforensics.com/",t:["image"],d:"Error-level analysis, metadata."},
+{n:"Forensically",c:"Image",u:"https://29a.ch/photo-forensics/",t:["image"],d:"Client-side clone/ELA/noise analysis."},
+{n:"FaceCheck.ID",c:"Image",u:"https://facecheck.id/",t:["image"],paid:true,d:"Face → social profiles. Upload only."},
+{n:"PimEyes",c:"Image",u:"https://pimeyes.com/",t:["image"],paid:true,d:"Face search across the web. Upload only; results paid."},
+{n:"Search4faces",c:"Image",u:"https://search4faces.com/",t:["image"],d:"Face search over VK/OK (RU/EE coverage)."},
+{n:"GeoSpy",c:"Image",u:"https://geospy.ai/",t:["image"],paid:true,d:"AI photo geolocation. Verify with maps."},
+{n:"Picarta",c:"Image",u:"https://picarta.ai/",t:["image"],paid:true,d:"AI geolocation from image content."},
+// --- Geo ---
+{n:"Google Maps",c:"Geo",q:"https://www.google.com/maps/search/{q}",t:["coords","name","any"],d:"Search place or lat,lon."},
+{n:"Google Earth",c:"Geo",q:"https://earth.google.com/web/search/{q}",t:["coords"],v:false,d:"3D, historical imagery (desktop)."},
+{n:"OpenStreetMap",c:"Geo",q:"https://www.openstreetmap.org/search?query={q}",t:["coords"],d:"Detailed POI tags."},
+{n:"Bing Maps",c:"Geo",q:"https://www.bing.com/maps?q={q}",t:["coords"],d:"Bird's-eye oblique imagery in many areas."},
+{n:"Mapillary",c:"Geo",u:"https://www.mapillary.com/app/",t:["coords"],d:"Crowd street-level imagery."},
+{n:"KartaView",c:"Geo",u:"https://kartaview.org/map/",t:["coords"],d:"Street-level imagery (open)."},
+{n:"SunCalc",c:"Geo",u:"https://www.suncalc.org/",t:["coords"],d:"Shadow direction → time/date."},
+{n:"Zoom Earth",c:"Geo",u:"https://zoom.earth/",t:["coords"],d:"Near-real-time satellite and weather."},
+{n:"Sentinel Hub EO Browser",c:"Geo",u:"https://apps.sentinel-hub.com/eo-browser/",t:["coords"],d:"Free medium-res satellite time series."},
+{n:"Wikimapia",c:"Geo",u:"https://wikimapia.org/",t:["coords"],d:"Crowd-labelled places."},
+{n:"What3words",c:"Geo",u:"https://what3words.com/",t:["coords"],d:"Convert 3-word addresses."},
+{n:"Bellingcat OSM search",c:"Geo",u:"https://osm-search.bellingcat.com/",t:["coords"],d:"Find places by described features/distances."},
+// --- Social / real-time ---
+{n:"Social Searcher",c:"Social",q:"https://www.social-searcher.com/social-buzz/?q5={q}",t:["any","name","username"],d:"Cross-network mention search."},
+{n:"X advanced (live)",c:"Social",q:"https://x.com/search?q={q}&f=live",t:["any","name","username","phone","email"],d:"Latest posts mentioning the term."},
+{n:"Reddit search",c:"Social",q:"https://www.reddit.com/search/?q={q}",t:["any","name","username"],d:"Native search."},
+{n:"Reddit comment search",c:"Social",q:"https://redditcommentsearch.com/?query={q}",t:["username"],v:false,d:"Search a user's comment history."},
+{n:"Reveddit",c:"Social",q:"https://www.reveddit.com/y/{q}/",t:["username"],d:"Mod-removed Reddit content for a user."},
+{n:"PullPush (Reddit archive)",c:"Social",u:"https://pullpush.io/",t:["username"],d:"Pushshift successor API for deleted content."},
+{n:"TGStat",c:"Social",q:"https://tgstat.com/search?q={q}",t:["any","username"],v:false,d:"Telegram channel/post analytics."},
+{n:"Telegram search (TgramSearch)",c:"Social",u:"https://tgramsearch.com/",t:["any","username"],d:"Telegram channels/groups."},
+{n:"4chan search",c:"Social",u:"https://4chansearch.com/",t:["any"],d:"Archived boards."},
+{n:"Social Blade",c:"Social",q:"https://socialblade.com/youtube/user/{q}",t:["username"],v:false,d:"Channel stats across platforms."},
+{n:"Facebook (Google site search)",c:"Social",q:"https://www.google.com/search?q=site%3Afacebook.com+%22{q}%22",t:["name","username","phone","email"],d:"FB internal search is weak; dork it."},
+{n:"Lookup-ID",c:"Social",u:"https://lookup-id.com/",t:["url"],d:"Facebook numeric ID from profile URL."},
+// --- Code / paste / files ---
+{n:"GitHub code search",c:"Code & pastes",q:"https://github.com/search?q=%22{q}%22&type=code",t:["any","email","domain","username","ip"],d:"Leaked keys, configs, mentions (login)."},
+{n:"grep.app",c:"Code & pastes",q:"https://grep.app/search?q={q}",t:["any","email","domain","username"],d:"Fast public-repo code search."},
+{n:"PublicWWW",c:"Code & pastes",q:"https://publicwww.com/websites/%22{q}%22/",t:["any","domain"],d:"Sites whose source contains the string (tracking IDs!)."},
+{n:"Sourcegraph",c:"Code & pastes",q:"https://sourcegraph.com/search?q={q}",t:["any"],d:"Public code search."},
+{n:"Pastebin via Google",c:"Code & pastes",q:"https://www.google.com/search?q=site%3Apastebin.com+%22{q}%22",t:["any","email","username","phone"],d:"Indexed pastes."},
+{n:"ODCrawler (open dirs)",c:"Code & pastes",q:"https://odcrawler.xyz/?q={q}",t:["any"],v:false,d:"Open directory file index."},
+// --- Dark web ---
+{n:"Ahmia",c:"Dark web",q:"https://ahmia.fi/search/?q={q}",t:["any","email","username","domain"],d:"Clearnet index of .onion sites."},
+{n:"onion-lookup (AIL)",c:"Dark web",u:"https://onion.ail-project.org/",t:["any"],d:"Check known .onion services."},
+// --- Crypto ---
+{n:"Blockchair",c:"Crypto",q:"https://blockchair.com/search?q={q}",t:["btc","eth","hash"],d:"Multi-chain explorer."},
+{n:"Blockchain.com (BTC)",c:"Crypto",q:"https://www.blockchain.com/explorer/addresses/btc/{q}",t:["btc"],d:"Bitcoin address."},
+{n:"Etherscan (ETH)",c:"Crypto",q:"https://etherscan.io/address/{q}",t:["eth"],d:"Ethereum address/contract."},
+{n:"Chainabuse",c:"Crypto",q:"https://www.chainabuse.com/address/{q}",t:["btc","eth"],d:"Scam reports for an address."},
+// --- Vehicle ---
+{n:"NHTSA VIN decoder",c:"Vehicle",q:"https://vpic.nhtsa.dot.gov/decoder/Decoder?VIN={q}",t:["vin"],d:"Official make/model/year decode."},
+{n:"NICB VINCheck",c:"Vehicle",u:"https://www.nicb.org/vincheck",t:["vin"],d:"Theft/salvage (5 per day)."},
+{n:"FaxVIN",c:"Vehicle",u:"https://www.faxvin.com/",t:["vin"],d:"History summary; details paid.",paid:true},
+// --- Hash / malware ---
+{n:"VirusTotal file",c:"Malware",q:"https://www.virustotal.com/gui/file/{q}",t:["hash"],d:"File hash lookup."},
+{n:"MalwareBazaar",c:"Malware",q:"https://bazaar.abuse.ch/browse.php?search=sha256%3A{q}",t:["hash"],d:"Sample database."},
+{n:"Hybrid Analysis",c:"Malware",q:"https://www.hybrid-analysis.com/search?query={q}",t:["hash","domain","ip"],d:"Sandbox reports."},
+{n:"OTX AlienVault",c:"Malware",q:"https://otx.alienvault.com/browse/global/pulses?q={q}",t:["hash","domain","ip"],d:"Community threat intel pulses."},
+// --- Maritime / aviation ---
+{n:"VesselFinder",c:"Transport",u:"https://www.vesselfinder.com/",t:[],d:"AIS ship tracking."},
+{n:"MarineTraffic",c:"Transport",u:"https://www.marinetraffic.com/",t:[],d:"AIS ship tracking."},
+{n:"ADS-B Exchange",c:"Transport",u:"https://globe.adsbexchange.com/",t:[],d:"Unfiltered aircraft tracking."},
+{n:"Flightradar24",c:"Transport",u:"https://www.flightradar24.com/",t:[],d:"Aircraft tracking (filtered)."},
+// --- Frameworks / meta ---
+{n:"OSINT Framework",c:"Frameworks",u:"https://osintframework.com/",t:[],d:"Categorized tree of tools."},
+{n:"Bellingcat Toolkit",c:"Frameworks",u:"https://bellingcat.gitbook.io/toolkit",t:[],d:"Vetted tool write-ups by category."},
+{n:"cipher387 tool collection",c:"Frameworks",u:"https://cipher387.github.io/osint_stuff_tool_collection/",t:[],d:"Several hundred online tools."},
+{n:"Awesome-OSINT (jivoi)",c:"Frameworks",u:"https://github.com/jivoi/awesome-osint",t:[],d:"The big curated list."},
+{n:"Awesome-OSINT-For-Everything",c:"Frameworks",u:"https://github.com/Astrosp/Awesome-OSINT-For-Everything",t:[],d:"1,000+ tools."},
+{n:"Ultimate OSINT Collection (start.me)",c:"Frameworks",u:"https://start.me/p/DPYPMz/the-ultimate-osint-collection",t:[],d:"Hatless1der's dashboard."},
+{n:"OSINT_Inception-links",c:"Frameworks",u:"https://github.com/C3n7ral051nt4g3ncy/OSINT_Inception-links",t:[],d:"Index of ~100 start.me OSINT pages."},
+{n:"OSINT Combine bookmark stack",c:"Frameworks",u:"https://www.osintcombine.com/osint-bookmarks",t:[],d:"Importable browser bookmarks."},
+{n:"IntelTechniques",c:"Frameworks",u:"https://inteltechniques.com/tools/",t:[],paid:true,d:"Bazzell's search tools (members)."},
+{n:"Maltego",c:"Frameworks",u:"https://www.maltego.com/",t:[],paid:true,d:"Link analysis; free Basic tier w/ credit caps."},
+{n:"SpiderFoot",c:"Frameworks",u:"https://github.com/smicallef/spiderfoot",t:[],cli:true,d:"200+ module automated recon (self-host)."},
+{n:"Hunchly",c:"Frameworks",u:"https://www.hunch.ly/",t:[],paid:true,d:"Automatic web evidence capture."},
+{n:"Auto Archiver (Bellingcat)",c:"Frameworks",u:"https://github.com/bellingcat/auto-archiver",t:[],cli:true,d:"Archive URLs with hashes and screenshots."},
+// --- Blogs / learning ---
+{n:"Sector035 Week in OSINT",c:"Learn",u:"https://sector035.nl/",t:[],d:"Weekly new tools/techniques."},
+{n:"OSINTCurious",c:"Learn",u:"https://osintcurio.us/",t:[],d:"Techniques and webcasts."},
+{n:"NixIntel",c:"Learn",u:"https://nixintel.info/",t:[],d:"Practical guides."},
+{n:"Cyber Detective (Substack)",c:"Learn",u:"https://cybdetective.substack.com/",t:[],d:"Tool roundups and cheat sheets."},
+{n:"r/OSINT",c:"Learn",u:"https://www.reddit.com/r/OSINT/",t:[],d:"The subreddit."},
+];
+
+const TYPES = ["username","email","phone","ip","domain","url","image","name","company","hash","btc","eth","vin","coords"];
+const TYPE_LABEL = {username:"Username",email:"Email",phone:"Phone",ip:"IP address",domain:"Domain",url:"URL",image:"Image URL",name:"Person name",company:"Company",hash:"File hash",btc:"BTC address",eth:"ETH address",vin:"VIN",coords:"Coordinates"};
+
+// ---------- Detection ----------
+function detect(s){
+  s=s.trim(); if(!s) return null;
+  if(/^https?:\/\/\S+\.(jpe?g|png|gif|webp|bmp|tiff?)(\?.*)?$/i.test(s)) return "image";
+  if(/^https?:\/\//i.test(s)) return "url";
+  if(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)) return "email";
+  if(/^(\d{1,3}\.){3}\d{1,3}$/.test(s) || /^[0-9a-f:]+:[0-9a-f:]+$/i.test(s)) return "ip";
+  if(/^-?\d{1,2}\.\d+\s*,\s*-?\d{1,3}\.\d+$/.test(s)) return "coords";
+  if(/^0x[0-9a-f]{40}$/i.test(s)) return "eth";
+  if(/^(bc1[0-9a-z]{25,62}|[13][a-km-zA-HJ-NP-Z1-9]{25,34})$/.test(s)) return "btc";
+  if(/^[0-9a-f]{32}$|^[0-9a-f]{40}$|^[0-9a-f]{64}$/i.test(s)) return "hash";
+  if(/^[A-HJ-NPR-Z0-9]{17}$/i.test(s) && /\d/.test(s)) return "vin";
+  if(/^\+?[\d\s().-]{7,20}$/.test(s) && (s.replace(/\D/g,"").length>=7)) return "phone";
+  if(/^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(s) && /\.[a-z]{2,}$/i.test(s)) return "domain";
+  if(/\b(inc|llc|ltd|corp|co|company|plumbing|services|group|holdings)\b\.?$/i.test(s)) return "company";
+  if(/\s/.test(s)) return "name";
+  return "username";
+}
+function host(s){ try{ return new URL(/^https?:\/\//i.test(s)?s:"https://"+s).hostname; }catch(e){ return s; } }
+function fill(tpl,raw){
+  const q=encodeURIComponent(raw);
+  return tpl.replace(/{q}/g,q).replace(/{raw}/g,raw).replace(/{digits}/g,raw.replace(/\D/g,""))
+    .replace(/{dash}/g,raw.trim().replace(/\s+/g,"-")).replace(/{lower}/g,raw.toLowerCase()).replace(/{host}/g,host(raw));
+}
+function badges(t){
+  let b="";
+  if(t.cli) b+='<span class="badge cli">CLI</span>';
+  else if(t.q) b+='<span class="badge">direct</span>'; else b+='<span class="badge paste">paste</span>';
+  if(t.paid) b+='<span class="badge paid">paid</span>';
+  if(t.v===false) b+='<span class="badge unv">unverified</span>';
+  return b;
+}
+
+// ---------- State ----------
+let curType=null, override=null;
+const $=s=>document.querySelector(s);
+function toast(m){const t=$("#toast");t.textContent=m;t.style.display="block";clearTimeout(t._h);t._h=setTimeout(()=>t.style.display="none",2200);}
+function store(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+function load(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}}
+
+// ---------- Pivot view ----------
+function renderTypeChips(){
+  $("#typechips").innerHTML=TYPES.map(t=>`<span class="chip ${override===t?'on':''}" data-t="${t}">${TYPE_LABEL[t]}</span>`).join(" ")+` <span class="chip ${override===null?'on':''}" data-t="">auto</span>`;
+  $("#typechips").querySelectorAll(".chip").forEach(c=>c.onclick=()=>{override=c.dataset.t||null;renderPivots();});
+}
+function renderPivots(){
+  const raw=$("#q").value.trim();
+  const auto=detect(raw); curType=override||auto;
+  $("#detected").textContent=auto?TYPE_LABEL[auto]:"—";
+  renderTypeChips();
+  $("#pivotType").textContent=curType?TYPE_LABEL[curType]:"—";
+  const list=curType?TOOLS.filter(t=>t.t.includes(curType)||(t.t.includes("any")&&!["image","coords","hash","btc","eth","vin"].includes(curType))):[];
+  $("#pivotCount").textContent=list.length?`· ${list.length} tools`:"";
+  $("#hint").textContent=raw?"":"Type a selector above to light up pivots.";
+  $("#pivots").innerHTML=list.map((t,i)=>{
+    const url=t.q&&raw?fill(t.q,raw):(t.u||t.q&&fill(t.q,""));
+    const sel=!!(t.q&&!t.cli&&!t.paid);
+    return `<div class="tool"><div class="t"><a href="${url}" target="_blank" rel="noopener" data-n="${t.n}">${t.n}</a><label><input type="checkbox" data-url="${url}" data-n="${t.n}" ${sel?'checked':''}>open</label></div><div class="d">${badges(t)} <span class="mute">${t.c}</span> — ${t.d}</div></div>`;
+  }).join("")||'<div class="mute">No pivots for this type.</div>';
+  $("#pivots").querySelectorAll("a").forEach(a=>a.onclick=()=>logPivot(a.dataset.n,a.href));
+}
+function selected(){return [...$("#pivots").querySelectorAll("input:checked")];}
+$("#q").addEventListener("input",()=>{override=null;renderPivots();});
+$("#selAll").onclick=()=>$("#pivots").querySelectorAll("input").forEach(i=>i.checked=true);
+$("#selNone").onclick=()=>$("#pivots").querySelectorAll("input").forEach(i=>i.checked=false);
+$("#selFree").onclick=()=>{renderPivots();};
+$("#copySel").onclick=()=>{const s=selected().map(i=>i.dataset.url).join("\n");if(!s)return toast("Nothing selected");navigator.clipboard.writeText(s).then(()=>toast(`Copied ${selected().length} URLs`)).catch(()=>toast("Clipboard blocked — select & copy manually"));};
+$("#openSel").onclick=()=>{
+  const s=selected(); if(!s.length) return toast("Nothing selected");
+  let ok=0;
+  s.forEach(i=>{ const w=window.open(i.dataset.url,"_blank","noopener"); if(w){ok++;logPivot(i.dataset.n,i.dataset.url);} });
+  if(ok<s.length) toast(`Opened ${ok}/${s.length}. Pop-ups blocked — allow pop-ups for this page, or run the HTML file locally, or click links individually.`);
+  else toast(`Opened ${ok} tabs`);
+};
+
+// ---------- Browse view ----------
+let catFilter=null;
+function renderBrowse(){
+  const f=$("#filter").value.toLowerCase();
+  const cats=[...new Set(TOOLS.map(t=>t.c))];
+  $("#catchips").innerHTML=`<span class="chip ${catFilter===null?'on':''}" data-c="">All</span> `+cats.map(c=>`<span class="chip ${catFilter===c?'on':''}" data-c="${c}">${c}</span>`).join(" ");
+  $("#catchips").querySelectorAll(".chip").forEach(c=>c.onclick=()=>{catFilter=c.dataset.c||null;renderBrowse();});
+  const list=TOOLS.filter(t=>(!catFilter||t.c===catFilter)&&(!f||(t.n+" "+t.c+" "+t.d+" "+t.t.join(" ")).toLowerCase().includes(f)));
+  $("#all").innerHTML=list.map(t=>`<div class="tool"><div class="t"><a href="${t.u||t.q.split("{")[0].replace(/[?&=]+$/,"")}" target="_blank" rel="noopener">${t.n}</a></div><div class="d">${badges(t)} <span class="mute">${t.c}</span> — ${t.d}</div></div>`).join("");
+}
+$("#filter").addEventListener("input",renderBrowse);
+
+// ---------- Case ----------
+let caseData=load("osint_case",{name:"",notes:"",log:[]});
+function renderCase(){
+  $("#caseName").value=caseData.name||"";$("#notes").value=caseData.notes||"";
+  $("#log").innerHTML=caseData.log.slice().reverse().map(e=>`<li><time>${e.ts}</time><b>${e.n}</b> <a href="${e.url}" target="_blank" rel="noopener" class="small">${e.url.length>70?e.url.slice(0,70)+"…":e.url}</a></li>`).join("")||'<li class="mute">No pivots logged yet.</li>';
+}
+function logPivot(n,url){caseData.log.push({ts:new Date().toISOString().replace("T"," ").slice(0,19)+"Z",n,url,sel:$("#q").value.trim()});store("osint_case",caseData);renderCase();}
+$("#caseName").addEventListener("input",e=>{caseData.name=e.target.value;store("osint_case",caseData);});
+$("#notes").addEventListener("input",e=>{caseData.notes=e.target.value;store("osint_case",caseData);});
+$("#clearCase").onclick=()=>{if($("#clearCase").dataset.arm){caseData={name:"",notes:"",log:[]};store("osint_case",caseData);renderCase();delete $("#clearCase").dataset.arm;$("#clearCase").textContent="Clear case";}else{$("#clearCase").dataset.arm=1;$("#clearCase").textContent="Click again to confirm";setTimeout(()=>{delete $("#clearCase").dataset.arm;$("#clearCase").textContent="Clear case";},3000);}};
+$("#exportMd").onclick=()=>{
+  const md=`# Case: ${caseData.name||"(untitled)"}\nExported ${new Date().toISOString()}\n\n## Notes\n${caseData.notes||"_none_"}\n\n## Pivot log\n| Time (UTC) | Selector | Tool | URL |\n|---|---|---|---|\n`+caseData.log.map(e=>`| ${e.ts} | ${e.sel||""} | ${e.n} | ${e.url} |`).join("\n");
+  navigator.clipboard.writeText(md).then(()=>toast("Markdown copied")).catch(()=>toast("Clipboard blocked"));
+};
+
+// ---------- Nav ----------
+document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll("nav button").forEach(x=>x.classList.remove("on"));b.classList.add("on");
+  document.querySelectorAll(".view").forEach(v=>v.classList.remove("on"));$("#v-"+b.dataset.v).classList.add("on");
+  if(b.dataset.v==="browse")renderBrowse(); if(b.dataset.v==="case")renderCase();
+});
+document.addEventListener("keydown",e=>{if(e.key==="/"&&document.activeElement.tagName!=="INPUT"&&document.activeElement.tagName!=="TEXTAREA"){e.preventDefault();$("#q").focus();}});
+
+renderPivots(); renderCase();
+</script>
+</body>
+</html>
